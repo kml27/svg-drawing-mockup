@@ -1,0 +1,168 @@
+<body>
+<style>
+svg circle:hover {
+	filter: url(#dropshadow);
+}
+</style>
+
+<!-- html5, body-ok -->
+<link rel="stylesheet" href="css/style.css"/>
+
+
+<div id="arrange">
+    <button><i class="material-icons">open_with</i></button>
+    <button><i class="material-icons">flip_to_front</i></button>
+    <button><i class="material-icons">arrow_upward</i></button>
+    <button><i class="material-icons">arrow_downward</i></button>
+    <button><i class="material-icons">flip_to_back</i></button>
+    <button><i class="material-icons">delete</i></button>
+    <button><i class="material-icons">delete_forever</i></button>
+</div>
+
+<div id="toolbar">
+    <button onclick="setTextTool();"><i class="material-icons">format_shapes</i></button>
+    <button onclick="setLineTool();"><i class="material-icons">border_color</i></button>
+    <button onclick="setCircleTool();"><i class="material-icons">panorama_fish_eye</i></button>
+    <button onclick="setPolyTool();"><i class="material-icons">show_chart</i></button>
+    <button onclick="toggleLayerPanel();"><i class="material-icons">layers</i></button>
+</div>
+
+<div id="functions">
+    <button>Save <i class="material-icons">save</i></button>
+    <button>Choose Template... <i class="material-icons">image</i></button>
+    <button onclick="document.querySelector('#upload').click();">Upload File <i class="material-icons">file_upload</i></button>
+    <button></button>
+</div>
+
+<form method="POST">
+  <input id="upload" type="file" hidden/>
+</form>
+
+<script src="svg.js"></script>
+<script src="svg.draw.js"></script>
+
+<div id="svg-container-div">
+  <svg id="root-svg" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="300">
+    <filter id="dropshadow" height="130%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation=".2"/> <!-- stdDeviation is how much to blur -->
+       <!-- <feComponentTransfer>
+       <feFuncR type="linear" slope=".01" intercept="1"/>
+       <feFuncG type="linear" slope="0" intercept="0"/>
+       <feFuncB type="linear" slope="0" intercept="0"/>
+       <feFuncA type="linear" slope="0" intercept="1"/>
+       </feComponentTransfer>  -->
+      
+        <feComponentTransfer>
+          <feFuncA type="linear" slope="0.8"/> <!-- slope is the opacity of the shadow -->
+        </feComponentTransfer>
+        <feMerge> 
+          <feMergeNode/> <!-- this contains the offset blurred image -->
+          <feMergeNode in="SourceGraphic"/> <!-- this contains the element that the filter is applied to -->
+        </feMerge>
+      </filter>
+      <circle cx="20" cy="20" r="2"/>
+      
+  </svg>
+</div>
+  
+<script>
+var drawing;
+var tool;
+
+var toolMap = {}
+
+SVG.on(document, 'DOMContentLoaded', function() {
+
+    drawing = SVG('root-svg').size('100%', '80%');
+
+    tool = drawing.line().attr('stroke',"black").attr('stroke-width',.25).attr('fill','none');
+
+    attachTool();
+
+    drawing.on('mousedown', function(e){
+        console.log("mousedown occurred, tool is ", tool);
+        
+        tool.draw(e);
+    }, false);
+
+    drawing.on('mouseup', function(e){
+        console.log("mouseup occurred, tool is ", tool);
+        tool.draw('stop', e);
+        
+    }, false);
+
+});
+
+function attachTool(){
+    
+    tool.on('drawstop', function(e){
+      console.log("drawstop occurrred");
+      switch(tool.type){
+          case "text":
+              tool = drawing.text().attr('stroke',"black").attr('stroke-width',.25).attr('fill','black');
+              break;
+          case "line":
+              tool = drawing.line().attr('stroke',"black").attr('stroke-width',.25).attr('fill','none');
+              break;
+          case "circle":
+              tool = drawing.circle().attr('stroke',"black").attr('stroke-width',.25).attr('fill','none');
+              break;
+          case "polyline":
+              tool = drawing.polyline().attr('stroke',"black").attr('stroke-width',.25).attr('fill','none');
+              break;
+        }
+        
+        attachTool();
+    }, tool);
+}
+
+function setTextTool(){
+  tool = drawing.text().attr('stroke',"black").attr('stroke-width',.25).attr('fill','black');
+  attachTool();
+}
+
+function setLineTool(){
+  tool = drawing.line().attr('stroke',"black").attr('stroke-width',.25).attr('fill','none');
+  attachTool();
+}
+
+function setCircleTool(){
+  tool = drawing.circle().attr('stroke',"black").attr('stroke-width',.25).attr('fill','none');
+  attachTool();
+}
+
+function setPolyTool(){
+  tool = drawing.polyline().attr('stroke',"black").attr('stroke-width',.25).attr('fill','none');
+}
+
+function toggleLayerPanel(){
+  
+  var layerPanel = document.querySelector("#layer-panel");
+  if(layerPanel.classList.contains("visibleLayerPanel")) {
+      layerPanel.classList.remove("visibleLayerPanel");
+  } else {
+      layerPanel.classList.add("visibleLayerPanel");
+  }
+
+
+}
+
+document.querySelector("#upload").addEventListener('change', function(e) {
+            if (window.File && window.FileReader && window.FileList && window.Blob) {
+                var reader = new FileReader();
+                reader.onload = function(event) {
+                    var img = new Image();
+                    img.onload = function() {
+                        drawing.image(this, this.height, this.width);
+                    }
+                    img.src = event.target.result;
+                }
+                reader.readAsDataURL(e.target.files[0]);
+            } else {
+                alert('your browser doesnot support on the fly fileupload');
+            }
+        });
+
+</script>
+
+</body>
