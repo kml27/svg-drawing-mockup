@@ -48,8 +48,8 @@ svg circle:hover {
   <input id="upload" type="file" hidden/>
 </form>
 
-<script src="svg.js"></script>
-<script src="svg.draw.js"></script>
+<script src="js/svg.js"></script>
+<script src="js/svg.draw.js"></script>
 
 <div id="svg-container-div">
   <svg id="root-svg" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="300" height="300">
@@ -188,12 +188,12 @@ function setSelectTool(){
                       return;
 
                     var bbox = elem.getBBox();
-                    //should replace hardcoded 40s and 20s with em conversions
-                    var selectRect = drawing.rect(bbox.width+40, bbox.height+40);
+                    //should replace hardcoded "padding" (+10, -5) with em conversions
+                    var selectRect = drawing.rect(bbox.width+10, bbox.height+10);
                       
                     selectRect
-                      .attr("x", bbox.x-20)
-                      .attr("y", bbox.y-20)
+                      .attr("x", bbox.x-5)
+                      .attr("y", bbox.y-5)
                       .attr("class", "selectedElement")
                       .attr("fill", "none")
                       .attr("stroke", "black");
