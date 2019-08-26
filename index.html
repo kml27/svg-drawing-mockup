@@ -1,0 +1,548 @@
+<body>
+<style>
+svg circle:hover {
+	filter: url(#dropshadow);
+}
+</style>
+
+<!-- html5, body-ok -->
+<link rel="stylesheet" href="css/style.css"/>
+
+<div id="textarea-popup" style="position: absolute; display: none;">
+    <textarea id="annotation-text"></textarea>
+    <div>
+        <button id="annotation-save" onclick="createText();"><i class="material-icons">save</i></button>
+        <button id="annotation-cancel" onclick="resetTextarea();"><i class="material-icons">cancel</i></button>
+    </div>
+</div>
+
+<div id="toolbar">
+    <button id="select-tool" width="24px" height="24px" onclick="setSelectTool();">
+        <svg height="24px" viewbox="0 0 20 20"><g><path d="M52.982,63.626L32.084,42.729L19.151,62.087L0.374,0.374l61.704,18.775L42.775,32.132l20.852,20.849L52.982,63.626z    M31.791,39.761L52.982,60.95l7.969-7.969L39.813,31.845L57.719,19.8L3.217,3.218l16.58,54.494L31.791,39.761z"/></g></svg>
+    </button>
+    <button id="text-tool" onclick="setTextTool();"><i class="material-icons">format_shapes</i></button>
+    <button onclick="document.querySelector('#upload').click();"><i class="material-icons">file_upload</i><i class="material-icons">image</i></button>
+    <button id="line-tool" onclick="setLineTool();"><i class="material-icons">border_color</i></button>
+    <button id="circle-tool" onclick="setCircleTool();"><i class="material-icons">panorama_fish_eye</i></button>
+    <button id="poly-tool" onclick="setPolyTool();"><i class="material-icons">show_chart</i></button>
+    <!--<button id="layer-panel-toggle" onclick="toggleLayerPanel();"><i class="material-icons">layers</i></button>-->
+</div>
+
+<div id="functions">
+    <button>Save <i class="material-icons">save</i></button>
+    <button>Choose Template... <i class="material-icons">image</i></button>
+    
+    <!--<button></button>-->
+</div>
+
+<form method="POST">
+  <input id="upload" type="file" hidden/>
+</form>
+
+<script src="js/svg.js"></script>
+<script src="js/svg.draw.js"></script>
+
+<div class="view-layer-parent">
+  <div id="svg-container-div" class="view-div" width="80%" height="80%">
+    <svg id="root-svg" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <filter id="dropshadow" height="130%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="3"/> <!-- stdDeviation is how much to blur -->
+        <!-- <feComponentTransfer>
+        <feFuncR type="linear" slope=".01" intercept="1"/>
+        <feFuncG type="linear" slope="0" intercept="0"/>
+        <feFuncB type="linear" slope="0" intercept="0"/>
+        <feFuncA type="linear" slope="0" intercept="1"/>
+        </feComponentTransfer>  -->
+        
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.8"/> <!-- slope is the opacity of the shadow -->
+          </feComponentTransfer>
+          <feMerge> 
+            <feMergeNode/> <!-- this contains the offset blurred image -->
+            <feMergeNode in="SourceGraphic"/> <!-- this contains the element that the filter is applied to -->
+          </feMerge>
+        </filter>
+    </svg>
+  </div>
+  <div id="arrange" class="layer-div">
+    <div id="layer-list-div">
+      <table id="layer-list">
+        <thead>
+          <tr>
+            <th>Selected</th>
+            <th>Visible</th>
+            <th>Type</th>
+            <th>Content</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox" disabled/></td>
+            <td><button disabled><i class="material-icons" disabled>visibility</i></button></td>
+            <td>Root</td>
+            <td><use href="#svg-root"/></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="layer-button-div">
+        <!-- fieldset doesnt respect flexbox styling, affecting every button is a little tedious, but necessary -->
+        <button id="move-tool" class="vert-button layer-button" onclick="setMoveTool();" disabled><i class="material-icons">open_with</i></button>
+        <button id="send-to-front-tool" class="vert-button layer-button" onclick="setSendFrontTool();" disabled><i class="material-icons">flip_to_front</i></button>
+        <button id="move-forward-tool" class="vert-button layer-button" onclick="setForwardTool();" disabled><i class="material-icons">arrow_upward</i></button>
+        <button id="move-backward-tool" class="vert-button layer-button" onclick="setBackwardTool();" disabled><i class="material-icons">arrow_downward</i></button>
+        <button id="send-to-back-tool" class="vert-button layer-button" onclick="setSendBackTool();" disabled><i class="material-icons">flip_to_back</i></button>
+        <button id="void-tool" class="vert-button layer-button" onclick="setVoidTool();" disabled><i class="material-icons">delete</i></button>
+        <button id="delete-tool" class="vert-button layer-button" onclick="setDeleteTool();" disabled><i class="material-icons">delete_forever</i></button>
+    </div>
+  </div>
+</div>
+  
+<script>
+var drawing;
+var tool;
+
+var toolMap = {
+  "draw" : {},
+  "layer" : {}
+};
+
+SVG.on(document, 'DOMContentLoaded', function() {
+
+    drawing = SVG('root-svg').size('100%', '80%');
+
+    toolMap["draw"]["select-tool"] = document.getElementById("select-tool");
+    toolMap["draw"]["text-tool"] = document.getElementById("text-tool");
+    toolMap["draw"]["line-tool"] = document.getElementById("line-tool");
+    toolMap["draw"]["circle-tool"] = document.getElementById("circle-tool");
+    toolMap["draw"]["poly-tool"] = document.getElementById("poly-tool");
+
+    toolMap["layer"]["move-tool"] = document.getElementById("move-tool");
+    toolMap["layer"]["send-to-front-tool"] = document.getElementById("send-to-front-tool");
+    toolMap["layer"]["move-forward-tool"] = document.getElementById("move-forward-tool");
+    toolMap["layer"]["move-backward-tool"] = document.getElementById("move-backward-tool");
+    toolMap["layer"]["send-to-back-tool"] = document.getElementById("send-to-back-tool");
+    toolMap["layer"]["void-tool"] = document.getElementById("void-tool");
+    toolMap["layer"]["delete-tool"] = document.getElementById("delete-tool");
+
+
+    setLineTool();
+    
+    drawing.on('mousedown', function(e){
+        console.log("mousedown occurred, tool is ", tool);
+        
+        tool.draw(e);
+    }, false);
+
+    drawing.on('mouseup', function(e){
+        console.log("mouseup occurred, tool is ", tool);
+        tool.draw('stop', e);
+        
+        
+    }, false);
+
+});
+
+function attachTool(){
+    
+    tool.on('drawstop', function(e){
+      console.log("drawstop occurrred");
+      switch(tool.type){
+          /*
+          case "text":
+              tool = drawing.text().attr('stroke',"black").attr('stroke-width',3).attr('fill','black');
+              break;
+          */
+          case "line":
+              //the tool instance becomes the new layer, after drawstop event a new instance will be referenced
+              //by the "tool" variable
+              addLayer(tool);
+              tool = drawing.line().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+              break;
+          case "circle":
+              addLayer(tool);
+              tool = drawing.circle().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+              break;
+          case "polyline":
+              addLayer(tool);
+              tool = drawing.polyline().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+              break;
+        }
+        
+        attachTool();
+    }, tool);
+}
+
+function setToggle(buttonId, exclusiveGroup) {
+  var pressedState = true;
+  
+  var button = document.getElementById(buttonId);
+
+  //if this button is a normal toggle, just toggle it
+  if(exclusiveGroup===undefined && button.hasAttribute("aria-pressed")){
+      pressedState = !button.getAttribute("aria-pressed");
+  }
+
+  button.setAttribute("aria-pressed", pressedState);
+
+  //if it's part of an exclusion group, set all the other toggles in the group to false
+  if(exclusiveGroup !== undefined) {
+    var otherButtons = Object.keys(toolMap[exclusiveGroup]).filter((id)=>id!=buttonId);
+    
+    otherButtons.forEach((id)=> {
+        var pressedState = document.createAttribute("aria-pressed");
+        pressedState.value=false;
+        toolMap[exclusiveGroup][id].setAttributeNode(pressedState);
+    });
+  }
+}
+
+function addLayer(svgElement){
+  var layerList = document.getElementById("layer-list");
+  var newRow = layerList.insertRow(1);
+
+  newRow.setAttribute("id", svgElement.id() +"-layer-info");
+
+  var cellVals = [
+                {
+                  type: "html",
+                  value: "<input type='checkbox'/>",
+                  func: function(elem) { 
+                      var svgTarget = document.getElementById(svgElement.node.id);
+                      var rootSvg = document.getElementById("root-svg");
+                      elem.addEventListener("click", (event)=>{
+                        //console.log(event);
+                        if (event.currentTarget.firstElementChild.checked) {
+                          selectElement(svgTarget, true);
+                        } else {
+                          selectElement(rootSvg, true);
+                        }
+                      });
+                    
+                    }
+                },
+                { 
+                  type: "html", 
+                  value:"<button><i class='material-icons'>visibility</i></button>",
+                  func: function(cell) { cell.addEventListener("click", (elem)=>toggleVisibility(elem, svgElement.node)) }
+                },
+                { 
+                  type: "txt",
+                  value: svgElement.type.charAt(0).toUpperCase() + svgElement.type.substr(1),
+                  func: function (){}
+                },
+                {
+                  type: "html",
+                  value: "<use href=#"+svgElement.id()+"/>",
+                  func: function(){}
+                }
+              ]
+
+  for( var i = 0; i < cellVals.length; i++ ) {
+
+      var cell = newRow.insertCell(i);
+      var curCellVal = cellVals[i];
+      var newChild;
+
+      switch(curCellVal.type){
+        case "txt":
+          newChild = document.createTextNode(curCellVal.value);
+
+          break;
+        case "html":
+          newChild = document.createRange().createContextualFragment(curCellVal.value);
+          break;
+      }
+
+      curCellVal.func(cell);
+
+      cell.appendChild(newChild);
+  }
+}
+
+function setEnabledStates(buttonList, enabledStates){
+
+  if( ! (enabledStates instanceof Array) ) {
+      enabledStates = Array(buttonList.length).fill(enabledStates);
+  }
+
+  buttonList.forEach((elem, i) => {
+      if( enabledStates[i] ){
+          elem.removeAttribute("disabled");
+      } else {
+          elem.addAttribute("disabled");
+      }
+  });
+
+}
+
+var selectedElements = [
+  /*
+      {
+        "elem": the selected element,
+        "selectRect": the svg rect with bbox coords and marching ants, could alternately use drop shadow et c.
+      }
+  */
+];
+
+function selectElement(elem, allowDefault){
+    console.log(elem);
+    //adjust the type of selection behavior here, this is the default of remove select on all selected elements and select new element
+
+    selectedElements.forEach((selectedInfo)=> {
+        selectedInfo.selectRect.remove();
+    });
+
+    //deselect elements
+    selectedElements = [];
+
+    if(elem.id == "root-svg")
+      return;
+
+    var bbox = elem.getBBox();
+    //should replace hardcoded "padding" (+10, -5) with em conversions
+    var selectRect = drawing.rect(bbox.width+10, bbox.height+10);
+      
+    selectRect
+      .attr("x", bbox.x-5)
+      .attr("y", bbox.y-5)
+      .attr("class", "selectedElement")
+      .attr("fill", "none")
+      .attr("stroke", "black");
+    
+    selectedElements.push({"elem": elem , "selectRect":selectRect});
+
+    if(allowDefault!==true)
+      event.preventDefault();
+
+    setEnabledStates(document.querySelectorAll(".layer-button"), true);
+}
+
+function setSelectTool(){
+  setToggle("select-tool", "draw");
+
+  tool = {
+            draw: function(e){
+
+                if(e instanceof Event){
+                    console.log(e, e.clientX, e.clientY);
+                    var elem = document.elementFromPoint(e.clientX, e.clientY);
+                    
+                    selectElement(elem);
+                } else {
+                    console.log("msg", e);
+                }
+            },
+            on: function(eventName, delegate, bind){}
+
+  };
+  attachTool();
+}
+
+function setTextTool(){
+  setToggle("text-tool", "draw");
+  tool =  {
+              draw: function(e){
+                if(e instanceof Event){
+                    var textareaPopup = document.getElementById("textarea-popup");
+                    var x = e.clientX + document.documentElement.scrollLeft + document.body.scrollLeft;
+                    var y = e.clientY + document.documentElement.scrollTop + document.body.scrollTop;
+                    textareaPopup.style.display="block";
+                    textareaPopup.style.left= x;
+                    textareaPopup.style.top=y;
+
+                    var textarea = document.getElementById("annotation-text")
+                    textarea.focus();
+                    event.preventDefault();
+                }
+              },
+              on: function(eventName, delegate, bind){}
+          };
+
+  attachTool();
+}
+
+function toggleVisibility(event, svgElement) {
+  
+  if(svgElement === undefined) {
+    return;
+  }
+
+  var elem = document.querySelector("#"+svgElement.id +"-layer-info i");
+  if(elem.textContent === "visibility") {
+    elem.textContent = "visibility_off";
+    svgElement.style.display = "none";
+  } else {
+    elem.textContent = "visibility";
+    svgElement.style.display = "inherit"
+  }
+  //this.getFirstChild().remove();
+
+  
+}
+
+function pxToInt(str) {
+  var res = 0;
+
+  if(str.endsWith("px"))
+    res = Number(str.substr(0, str.length-2));
+  
+    return res;
+}
+
+function createText(){
+  
+  var textareaPopup = document.getElementById("textarea-popup");
+  var text = document.querySelector("#textarea-popup #annotation-text").value;
+  var rootSvg = document.getElementById("root-svg");
+  var rootSvgBBox = rootSvg.getBoundingClientRect();
+  var parentOffsetX = rootSvgBBox.left;
+  var parentOffsetY = rootSvgBBox.top;
+  console.log(parentOffsetX, parentOffsetY, rootSvg);
+  
+  var y = pxToInt(textareaPopup.style.top) - parentOffsetY;
+  var x = pxToInt(textareaPopup.style.left) - parentOffsetX;
+
+  var textElement = drawing.text(text).attr("x",x).attr("y",y).attr('stroke',"black").attr('stroke-width',.5).attr('fill','black');
+
+  addLayer(textElement);
+
+  resetTextarea();
+}
+
+function resetTextarea(){
+  document.querySelector("#textarea-popup #annotation-text").value = "";
+  var textareaPopup = document.getElementById("textarea-popup");
+  textareaPopup.style.display = "none";
+
+}
+
+function setLineTool(){
+  setToggle("line-tool", "draw");
+  
+  tool = drawing.line().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+  attachTool();
+}
+
+function setCircleTool(){
+  setToggle("circle-tool", "draw");
+
+  tool = drawing.circle().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+  attachTool();
+}
+
+function setPolyTool(){
+  setToggle("poly-tool", "draw");
+
+  tool = drawing.polyline().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+  attachTool();
+}
+
+function setMoveTool(){
+  setToggle("move-tool", "layer");
+  selectedElements.forEach((selectEntry)=>{
+      selectEntry.selectRect.addClass("move");
+  });
+
+  tool =  {
+              drawStart: undefined,
+              draw: function(eOrMsg, e){
+                if(eOrMsg instanceof Event){
+                  //attach to mouse move?
+                  this.drawStart = {"x": eOrMsg.clientX, "y": eOrMsg.clientY}
+
+                }else if(typeof(eOrMsg)=="string" && eOrMsg==="stop") {
+                    
+                    var deltaX = e.clientX - this.drawStart.x;
+                    var deltaY = e.clientY - this.drawStart.y;
+
+                    selectedElements.forEach((elemEntry)=>{
+                        
+                        var elem = SVG.get(elemEntry.elem.id());
+                        
+                        //move up a tree if this is a child text span to get to the enclosing text element
+                        while (elem.type === "tspan") elem=elem.parent();
+
+                        switch(elem.type.toLowerCase()){
+                          case "line":
+                              var prevX1 = elem.attr("x1");
+                              var prevX2 = elem.attr("x2");
+                              var prevY1 = elem.attr("y1");
+                              var prevY2 = elem.attr("y2");
+
+                              elem.attr("x1", prevX1+deltaX);
+                              elem.attr("x2", prevX2+deltaX);
+                              elem.attr("y1", prevY1+deltaY);
+                              elem.attr("y2", prevY2+deltaY);
+                              break;
+                          case "circle":
+                              var prevX = elem.attr("cx");
+                              var prevY = elem.attr("cy");
+
+                              elem.attr("cx", prevX+deltaX);
+                              elem.attr("cy", prevY+deltaY);
+                              break;
+                          
+                          case "text":
+                          case "image":
+                              var prevX = elem.attr("x");
+                              var prevY = elem.attr("y");
+
+                              elem.attr("x", prevX+deltaX);
+                              elem.attr("y", prevY+deltaY);
+                              break;
+                        }
+
+                        elem = elemEntry.selectRect;
+
+                        prevX = elem.attr("x");
+                        prevY = elem.attr("y");
+
+                        elem.attr("x", prevX+deltaX);
+                        elem.attr("y", prevY+deltaY);
+
+                    });
+                    //event.preventDefault();
+
+                    this
+
+                    this.drawStart = undefined;
+                }
+              },
+              on: function(eventName, delegate, bind){}
+          };
+
+  attachTool();
+
+}
+
+function toggleLayerPanel(){
+  //setToggle("layer-panel-toggle", );
+
+  var layerPanel = document.querySelector("#layer-panel");
+  if(layerPanel.classList.contains("visibleLayerPanel")) {
+      layerPanel.classList.remove("visibleLayerPanel");
+  } else {
+      layerPanel.classList.add("visibleLayerPanel");
+  }
+}
+
+document.querySelector("#upload").addEventListener('change', function(e) {
+            if (window.File && window.FileReader && window.FileList && window.Blob) {
+                var reader = new FileReader();
+                reader.onload = function(event) {
+                    var img = new Image();
+                    
+                    var imageElement = drawing.image(event.target.result);
+
+                    addLayer(imageElement);
+                }
+                reader.readAsDataURL(e.target.files[0]);
+            } else {
+                alert('your browser does not support on-the-fly file upload');
+            }
+        });
+
+</script>
+
+</body>

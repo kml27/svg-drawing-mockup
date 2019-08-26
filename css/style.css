@@ -57,3 +57,67 @@
     stroke-dashoffset: 8px;
     animation: ants 0.2s linear infinite;
 }
+
+.view-layer-parent {
+    display: flex;
+}
+
+.view-div {
+    flex: 1;
+    padding-right: .5em;
+}
+
+.layer-div {
+    display: flex;
+    flex-shrink: 0;
+}
+
+#layer-list-div {
+    display: flex;
+    flex-shrink: 0;
+    padding-right: .5em;
+}
+
+table {
+    overflow-x: scroll;
+    height: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    border: .1em solid black;
+}
+
+tbody {
+    overflow-y: scroll;
+    border: .1em solid black;
+}
+
+tr {
+    height: 1em;
+    flex: 0;
+}
+
+tbody tr:nth-child(odd){
+    background-color: lightgrey;
+}
+
+td {
+    border: .1em solid black;
+}
+
+#layer-button-div {
+    display: flex;
+    justify-content: space-evenly;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.vert-button {
+    display: flex;
+    flex:1;
+}
+
+.move {
+    cursor: move;
+}
