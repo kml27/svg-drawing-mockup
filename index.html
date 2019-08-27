@@ -8,7 +8,7 @@ svg circle:hover {
 <!-- html5, body-ok -->
 <link rel="stylesheet" href="css/style.css"/>
 
-<div id="textarea-popup" style="position: absolute; display: none;">
+<div id="textarea-popup" style="position: absolute; display: none;" data-mode="create">
     <textarea id="annotation-text"></textarea>
     <div>
         <button id="annotation-save" onclick="createText();"><i class="material-icons">save</i></button>
@@ -69,13 +69,13 @@ svg circle:hover {
       <table id="layer-list">
         <thead>
           <tr>
-            <th>Selected</th>
-            <th>Visible</th>
+            <th>Sel</th>
+            <th>Vis</th>
             <th>Type</th>
             <th>Content</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="layer-list-rows">
           <tr>
             <td><input type="checkbox" disabled/></td>
             <td><button disabled><i class="material-icons" disabled>visibility</i></button></td>
@@ -86,6 +86,7 @@ svg circle:hover {
       </table>
     </div>
     <div id="layer-button-div">
+        <button id="edit-tool" class="vert-button layer-button" onclick="setEditTool();" disabled><i class="material-icons">edit</i></button>
         <!-- fieldset doesnt respect flexbox styling, affecting every button is a little tedious, but necessary -->
         <button id="move-tool" class="vert-button layer-button" onclick="setMoveTool();" disabled><i class="material-icons">open_with</i></button>
         <button id="send-to-front-tool" class="vert-button layer-button" onclick="setSendFrontTool();" disabled><i class="material-icons">flip_to_front</i></button>
@@ -117,6 +118,7 @@ SVG.on(document, 'DOMContentLoaded', function() {
     toolMap["draw"]["circle-tool"] = document.getElementById("circle-tool");
     toolMap["draw"]["poly-tool"] = document.getElementById("poly-tool");
 
+    toolMap["layer"]["edit-tool"] = document.getElementById("edit-tool");
     toolMap["layer"]["move-tool"] = document.getElementById("move-tool");
     toolMap["layer"]["send-to-front-tool"] = document.getElementById("send-to-front-tool");
     toolMap["layer"]["move-forward-tool"] = document.getElementById("move-forward-tool");
@@ -124,7 +126,6 @@ SVG.on(document, 'DOMContentLoaded', function() {
     toolMap["layer"]["send-to-back-tool"] = document.getElementById("send-to-back-tool");
     toolMap["layer"]["void-tool"] = document.getElementById("void-tool");
     toolMap["layer"]["delete-tool"] = document.getElementById("delete-tool");
-
 
     setLineTool();
     
@@ -185,6 +186,8 @@ function setToggle(buttonId, exclusiveGroup) {
 
   button.setAttribute("aria-pressed", pressedState);
 
+  setTextSelectableState(true);
+
   //if it's part of an exclusion group, set all the other toggles in the group to false
   if(exclusiveGroup !== undefined) {
     var otherButtons = Object.keys(toolMap[exclusiveGroup]).filter((id)=>id!=buttonId);
@@ -215,6 +218,7 @@ function addLayer(svgElement){
                         if (event.currentTarget.firstElementChild.checked) {
                           selectElement(svgTarget, true);
                         } else {
+                          //this needs another arg to "deselect" to support multi-select correctly
                           selectElement(rootSvg, true);
                         }
                       });
@@ -261,17 +265,26 @@ function addLayer(svgElement){
 }
 
 function setEnabledStates(buttonList, enabledStates){
+  
+  var idMap = {};
+  buttonList.forEach((elem, i)=>{
+                            idMap[elem.id]=i;
+                        });
 
-  if( ! (enabledStates instanceof Array) ) {
-      enabledStates = Array(buttonList.length).fill(enabledStates);
-  }
+  var buttonIds = Array.from(buttonList).map(( elem )=>elem.id);
+
+  var enabledKeys = Object.keys(enabledStates);
+
+  if( enabledKeys.some((key)=>buttonIds.includes(key)) ) {
+    enabledStatesArr = Array(buttonList.length).fill(true);
+    enabledKeys.forEach((enabledKey)=>enabledStatesArr[idMap[enabledKey]]=enabledStates[enabledKey])
+    
+  } else if( ! (enabledStates instanceof Array) ) {
+      enabledStatesArr = Array(buttonList.length).fill(enabledStates);
+  } 
 
   buttonList.forEach((elem, i) => {
-      if( enabledStates[i] ){
-          elem.removeAttribute("disabled");
-      } else {
-          elem.addAttribute("disabled");
-      }
+      elem.disabled = !enabledStatesArr[i];
   });
 
 }
@@ -290,6 +303,8 @@ function selectElement(elem, allowDefault){
     //adjust the type of selection behavior here, this is the default of remove select on all selected elements and select new element
 
     selectedElements.forEach((selectedInfo)=> {
+        var selectedCheckbox = document.querySelector("#"+selectedInfo.elem.id+"-layer-info input[type='checkbox']");
+        selectedCheckbox.checked = false;
         selectedInfo.selectRect.remove();
     });
 
@@ -307,28 +322,76 @@ function selectElement(elem, allowDefault){
       .attr("x", bbox.x-5)
       .attr("y", bbox.y-5)
       .attr("class", "selectedElement")
-      .attr("fill", "none")
-      .attr("stroke", "black");
+      .attr("stroke", "black")
+      //for cursors (e.g. move) to work inside open figures, there must be a fill, but it can be completely transparent
+      .attr("fill", "grey")
+      .attr("fill-opacity", "0");
     
     selectedElements.push({"elem": elem , "selectRect":selectRect});
+
+    if(selectedElements.length > 1){
+        setEnabledStates(document.querySelectorAll(".layer-button"), {"edit-tool": false, "send-to-front-tool": false, "send-to-back-tool":false});
+    }
 
     if(allowDefault!==true)
       event.preventDefault();
 
-    setEnabledStates(document.querySelectorAll(".layer-button"), true);
+    //void-tool value should be determined based on the presence of data-obsid
+    setEnabledStates(document.querySelectorAll(".layer-button"), {"void-tool":false});
+
+    var selectedCheckbox = document.querySelector("#" + elem.id + "-layer-info input[type='checkbox']");
+    selectedCheckbox.checked = true;
+}
+
+function setTextSelectableState(selectable){
+  var svgTextElements = document.querySelectorAll("svg text");
+
+  if(selectable){
+    svgTextElements.forEach((elem)=>elem.classList.remove("svgTextUnselectable"));
+  }else {
+    svgTextElements.forEach((elem)=>elem.classList.add("svgTextUnselectable"));
+  }
+}
+
+function getSelectableElement(elem, returnSVG){
+  elem = SVG.get(elem.id);
+
+  if(elem.type === "rect") {
+                      //selecting an already selected element
+    elem = selectedElements.filter((elemEntry)=>elemEntry.selectRect===elem)[0].elem;
+
+  } else {
+      //move up a tree if this is a child text span to get to the enclosing text element
+      while (elem.type === "tspan") elem=elem.parent();
+
+      elem = document.querySelector("#"+elem.id());
+  }
+
+  if(returnSVG){
+      elem = SVG.get(elem.id);
+  }
+
+  return elem;
 }
 
 function setSelectTool(){
   setToggle("select-tool", "draw");
 
   tool = {
-            draw: function(e){
+            draw: function(eOrMsg, e){
 
-                if(e instanceof Event){
-                    console.log(e, e.clientX, e.clientY);
-                    var elem = document.elementFromPoint(e.clientX, e.clientY);
+                if( eOrMsg instanceof Event){
+                    console.log(eOrMsg, eOrMsg.clientX, eOrMsg.clientY);
+                    var elem = document.elementFromPoint(eOrMsg.clientX, eOrMsg.clientY);
                     
+                    elem = getSelectableElement(elem);
+
                     selectElement(elem);
+
+                    //after an element is selected make text unselectable so it doesnt interact with dragging behavior
+                    setTextSelectableState(false);
+                } else if( typeof(eOrMsg) === "string" && eOrMsg === "stop") {
+                    setTextSelectableState(true);
                 } else {
                     console.log("msg", e);
                 }
@@ -339,22 +402,33 @@ function setSelectTool(){
   attachTool();
 }
 
+function showTextPopup(top, left, mode, text) {
+    var textareaPopup = document.getElementById("textarea-popup");
+    textareaPopup.setAttribute("data-mode", mode);
+    var x = top + document.documentElement.scrollLeft + document.body.scrollLeft;
+    var y = left + document.documentElement.scrollTop + document.body.scrollTop;
+    textareaPopup.style.display="block";
+    textareaPopup.style.left= x;
+    textareaPopup.style.top=y;
+
+    var textarea = document.getElementById("annotation-text")
+    
+    if(text!==undefined) {
+        textarea.value = text;
+    }
+    
+    textarea.focus();
+    event.preventDefault();
+}
+
 function setTextTool(){
   setToggle("text-tool", "draw");
   tool =  {
               draw: function(e){
-                if(e instanceof Event){
-                    var textareaPopup = document.getElementById("textarea-popup");
-                    var x = e.clientX + document.documentElement.scrollLeft + document.body.scrollLeft;
-                    var y = e.clientY + document.documentElement.scrollTop + document.body.scrollTop;
-                    textareaPopup.style.display="block";
-                    textareaPopup.style.left= x;
-                    textareaPopup.style.top=y;
+                  if(e instanceof Event){
 
-                    var textarea = document.getElementById("annotation-text")
-                    textarea.focus();
-                    event.preventDefault();
-                }
+                      showTextPopup(e.clientX, e.clientY, "create");
+                  }
               },
               on: function(eventName, delegate, bind){}
           };
@@ -393,19 +467,31 @@ function pxToInt(str) {
 function createText(){
   
   var textareaPopup = document.getElementById("textarea-popup");
+  var mode = textareaPopup.getAttribute("data-mode");
   var text = document.querySelector("#textarea-popup #annotation-text").value;
   var rootSvg = document.getElementById("root-svg");
   var rootSvgBBox = rootSvg.getBoundingClientRect();
   var parentOffsetX = rootSvgBBox.left;
   var parentOffsetY = rootSvgBBox.top;
-  console.log(parentOffsetX, parentOffsetY, rootSvg);
+  //console.log(parentOffsetX, parentOffsetY, rootSvg);
   
   var y = pxToInt(textareaPopup.style.top) - parentOffsetY;
   var x = pxToInt(textareaPopup.style.left) - parentOffsetX;
 
-  var textElement = drawing.text(text).attr("x",x).attr("y",y).attr('stroke',"black").attr('stroke-width',.5).attr('fill','black');
+  
+
+  var textElement = drawing.text(text).attr("x", x).attr("y", y).attr("stroke","black").attr("stroke-width",.5).attr("fill","black");
 
   addLayer(textElement);
+
+  //remove and select new area after adding layer so selection in layer list is updated
+  if(mode==="edit") {
+      var origId = textareaPopup.getAttribute("data-id");
+
+      removeElement(SVG.get(origId));
+
+      selectElement(textElement.node);
+  }
 
   resetTextarea();
 }
@@ -438,6 +524,56 @@ function setPolyTool(){
   attachTool();
 }
 
+function gatherText(elem) {
+
+  var text = "";
+
+  Array.from(elem.node.children).forEach((child)=>{
+    text += child.textContent + "\n";
+  });
+
+  return text;
+}
+
+function setEditTool(){
+  
+  //edit should be disabled if multi-select for move/delete is ever implemented
+  if(selectedElements.length > 1)
+    return;
+
+  setToggle("edit-tool", "layer");
+
+  tool = {
+            draw: function(eOrMsg, e) {
+
+                var firstElem = selectedElements[0];
+                
+                //var elem = SVG.get(firstElem.elem.id);
+                                      
+                //move up a tree if this is a child text span to get to the enclosing text element
+                //while (elem.type === "tspan") elem=elem.parent();
+
+                //leave as an SVG object
+                var svgElem = getSelectableElement(firstElem.elem, true);
+
+                switch(svgElem.type) {
+                    case "text":
+                        var svgRoot = document.getElementById("root-svg");
+                        var svgRootBBox = svgRoot.getBoundingClientRect();
+                        var text = gatherText(svgElem);
+                        console.log(svgRootBBox.x, svgRootBBox.y);
+                        var textareaPopup = document.querySelector("#textarea-popup");
+                        textareaPopup.setAttribute("data-id", svgElem.id());
+                        showTextPopup(svgElem.attr("x")+svgRootBBox.x, svgElem.attr("y")+svgRootBBox.y, "edit", text);
+                        break;
+
+                }
+
+            },
+            on: function(eventName, delegate, bind){}
+  }
+}
+
 function setMoveTool(){
   setToggle("move-tool", "layer");
   selectedElements.forEach((selectEntry)=>{
@@ -458,7 +594,7 @@ function setMoveTool(){
 
                     selectedElements.forEach((elemEntry)=>{
                         
-                        var elem = SVG.get(elemEntry.elem.id());
+                        var elem = SVG.get(elemEntry.elem.id);
                         
                         //move up a tree if this is a child text span to get to the enclosing text element
                         while (elem.type === "tspan") elem=elem.parent();
@@ -514,6 +650,70 @@ function setMoveTool(){
 
   attachTool();
 
+}
+
+function removeSvgAndLayer(svgElem, layerRowId){
+  svg.remove()
+}
+
+function removeElement(svgElem) {
+  var layerList = document.getElementById("layer-list");
+  
+  var rootSvg = document.getElementById("root-svg");
+  
+  //build a map from id to index 
+  var idIndexMap = {};
+  var indexIdMap = {};
+
+  Array.from(layerList.rows)
+      .forEach((row,i)=>{
+        idIndexMap[row.id]=i;
+        indexIdMap[i]=row.id;
+        });
+
+  //selecting root deselects all elements
+  selectElement(rootSvg);
+  
+  if(!(svgElem instanceof Array)) {
+      svgElem = [svgElem];
+  }
+
+  svgElem.forEach((svg)=>{ 
+
+      var layerInfoId = svg.id()+"-layer-info";
+
+      //must be patched after every deleteRow (indices > curIndex must be decremented)
+      //is it better to patch these every time or cmp id strings every time on larger layer lists?
+      var index = idIndexMap[layerInfoId];
+      //just overwrites, last layer set undefined for gc? delete or leave dupe?
+      //delete indexIdMap[index];
+      
+      var curKeys = Object.keys(indexIdMap);
+      curKeys.forEach(function(curIndex){
+          if(curIndex>index) {
+            
+            if(curIndex > curKeys.length) {
+                indexIdMap[curIndex] = undefined;
+            }
+
+            var curId =indexIdMap[curIndex];
+
+            indexIdMap[curIndex-1] = curId;
+            idIndexMap[curId] = curIndex-1;
+            
+          }
+      });
+
+      layerList.deleteRow(index);
+
+      svg.remove();
+  });
+}
+
+function setDeleteTool() {
+    var svgElems = selectedElements
+      .map((elemEntry)=>SVG.get(elemEntry.elem.id));
+    removeElement(svgElems);
 }
 
 function toggleLayerPanel(){
