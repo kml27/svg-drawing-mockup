@@ -16,21 +16,34 @@ svg circle:hover {
     </div>
 </div>
 
+<div id="template-image-popup" style="position: absolute; display: none;" data-mode="create">
+    <div id="template-image-list">
+
+    </div>
+    <div id="template-image-preview">
+        <img id="template-image" src=""/>
+    </div>
+</div>
+
+<svg style="display:none;" viewbox="0 0 .1 .1"><g><path stroke="black" stroke-width="3" id="cursor-svg" d="M52.982,63.626L32.084,42.729L19.151,62.087L0.374,0.374l61.704,18.775L42.775,32.132l20.852,20.849L52.982,63.626z    M31.791,39.761L52.982,60.95l7.969-7.969L39.813,31.845L57.719,19.8L3.217,3.218l16.58,54.494L31.791,39.761z"/></g></svg>
+
 <div id="toolbar">
     <button id="select-tool" width="24px" height="24px" onclick="setSelectTool();">
-        <svg height="24px" viewbox="0 0 20 20"><g><path d="M52.982,63.626L32.084,42.729L19.151,62.087L0.374,0.374l61.704,18.775L42.775,32.132l20.852,20.849L52.982,63.626z    M31.791,39.761L52.982,60.95l7.969-7.969L39.813,31.845L57.719,19.8L3.217,3.218l16.58,54.494L31.791,39.761z"/></g></svg>
+        <svg width="24px" height="24px" viewbox="0 0 65 65"><use href="#cursor-svg"/></svg>
     </button>
     <button id="text-tool" onclick="setTextTool();"><i class="material-icons">format_shapes</i></button>
+    <button onclick="selectTemplate();"><i class="material-icons">image</i></button>
     <button onclick="document.querySelector('#upload').click();"><i class="material-icons">file_upload</i><i class="material-icons">image</i></button>
     <button id="line-tool" onclick="setLineTool();"><i class="material-icons">border_color</i></button>
     <button id="circle-tool" onclick="setCircleTool();"><i class="material-icons">panorama_fish_eye</i></button>
     <button id="poly-tool" onclick="setPolyTool();"><i class="material-icons">show_chart</i></button>
     <!--<button id="layer-panel-toggle" onclick="toggleLayerPanel();"><i class="material-icons">layers</i></button>-->
+    <button><i class="material-icons">save</i></button>
 </div>
 
 <div id="functions">
-    <button>Save <i class="material-icons">save</i></button>
-    <button>Choose Template... <i class="material-icons">image</i></button>
+    
+    
     
     <!--<button></button>-->
 </div>
@@ -80,7 +93,7 @@ svg circle:hover {
             <td><input type="checkbox" disabled/></td>
             <td><button disabled><i class="material-icons" disabled>visibility</i></button></td>
             <td>Root</td>
-            <td><use href="#svg-root"/></td>
+            <td><svg width="100%" height="100%" viewbox="0 0 10 10"><use href="#svg-root"/></svg></td>
           </tr>
         </tbody>
       </table>
@@ -130,17 +143,23 @@ SVG.on(document, 'DOMContentLoaded', function() {
     setLineTool();
     
     drawing.on('mousedown', function(e){
-        console.log("mousedown occurred, tool is ", tool);
-        
+        //console.log("mousedown occurred, tool is ", tool);
+
         tool.draw(e);
+
     }, false);
 
     drawing.on('mouseup', function(e){
-        console.log("mouseup occurred, tool is ", tool);
+        //console.log("mouseup occurred, tool is ", tool);
+
         tool.draw('stop', e);
         
-        
     }, false);
+
+//hacky uhg, overflow scroll won't work in flexbox without a fixed height?
+    var height = document.querySelector("#root-svg").clientHeight;
+    document.querySelector(".layer-div").style.height = height;
+    
 
 });
 
@@ -237,7 +256,7 @@ function addLayer(svgElement){
                 },
                 {
                   type: "html",
-                  value: "<use href=#"+svgElement.id()+"/>",
+                  value: "<svg width='100%' height='100%' viewbox='0 0 900 500'><use href=#"+svgElement.id()+"></use></svg>",
                   func: function(){}
                 }
               ]
@@ -379,9 +398,10 @@ function setSelectTool(){
 
   tool = {
             draw: function(eOrMsg, e){
-
+                console.log(eOrMsg, e);
                 if( eOrMsg instanceof Event){
                     console.log(eOrMsg, eOrMsg.clientX, eOrMsg.clientY);
+                    
                     var elem = document.elementFromPoint(eOrMsg.clientX, eOrMsg.clientY);
                     
                     elem = getSelectableElement(elem);
@@ -528,8 +548,14 @@ function gatherText(elem) {
 
   var text = "";
 
-  Array.from(elem.node.children).forEach((child)=>{
-    text += child.textContent + "\n";
+  var len = elem.node.children;
+
+  Array.from(elem.node.children).forEach((child, i)=>{
+      text += child.textContent 
+      
+      if(i+1<len){
+          text+= "\n";
+      }
   });
 
   return text;
@@ -725,6 +751,12 @@ function toggleLayerPanel(){
   } else {
       layerPanel.classList.add("visibleLayerPanel");
   }
+}
+
+function selectTemplate(){
+    var templatePopup = document.querySelector("#template-image-popup");
+    templatePopup.style.display = "visible";
+    //templatePopup
 }
 
 document.querySelector("#upload").addEventListener('change', function(e) {

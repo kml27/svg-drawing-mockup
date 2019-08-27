@@ -37,7 +37,6 @@
 
 #root-svg {
     border: solid black .1em;
-
 }
 
 [aria-pressed="true"] {
@@ -65,23 +64,26 @@
 .view-div {
     flex: 1;
     padding-right: .5em;
+    height: 100%;
 }
 
 .layer-div {
     display: flex;
-    flex-shrink: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
 }
 
 #layer-list-div {
-    display: flex;
-    flex-shrink: 0;
     padding-right: .5em;
+    overflow-y: scroll;
+    padding-bottom: 0;
+    margin-bottom: 0;
 }
 
 table {
-    overflow-x: scroll;
-    height: 100%;
     border-collapse: collapse;
+    padding-bottom: 0;
+    margin-bottom: 0;
 }
 
 thead {
@@ -89,7 +91,6 @@ thead {
 }
 
 tbody {
-    overflow-y: scroll;
     border: .1em solid black;
 }
 
@@ -124,4 +125,19 @@ td {
 
 .svgTextUnselectable {
     pointer-events: none;
+}
+
+#template-image-popup {
+    display: flex;
+    height: 75%;
+    width: 75%;
+}
+
+#template-image-list {
+    flex: 1;
+    overflow-y: scroll;
+}
+
+#template-image-preview {
+    flex: 2;
 }
