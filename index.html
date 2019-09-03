@@ -34,10 +34,11 @@ svg circle:hover {
     <button id="text-tool" onclick="setTextTool();"><i class="material-icons">format_shapes</i></button>
     <button onclick="selectTemplate();"><i class="material-icons">image</i></button>
     <button onclick="document.querySelector('#upload').click();"><i class="material-icons">file_upload</i><i class="material-icons">image</i></button>
+    <button id="path-tool" onclick="setPathTool();"><i class="material-icons">gesture</i></button>
     <button id="line-tool" onclick="setLineTool();"><i class="material-icons">border_color</i></button>
     <button id="circle-tool" onclick="setCircleTool();"><i class="material-icons">panorama_fish_eye</i></button>
-    <button id="poly-tool" onclick="setPolyTool();"><i class="material-icons">show_chart</i></button>
-    <!--<button id="layer-panel-toggle" onclick="toggleLayerPanel();"><i class="material-icons">layers</i></button>-->
+    <!--<button id="poly-tool" onclick="setPolyTool();"><i class="material-icons">show_chart</i></button>
+    <button id="layer-panel-toggle" onclick="toggleLayerPanel();"><i class="material-icons">layers</i></button>-->
     <button><i class="material-icons">save</i></button>
 </div>
 
@@ -121,15 +122,64 @@ var toolMap = {
   "layer" : {}
 };
 
+function extendPath(){
+  SVG.Element.prototype.draw.extend('path', {
+    init:function(e){
+
+        this.set = new SVG.Set();
+
+        var p = this.startPoint,
+        arr = [
+          //"Move To" start point
+                ["M", p.x, p.y]
+              ];
+
+        this.el.plot(arr);
+
+    },
+
+    // The calc-function sets the position of the last point to the mouse-position (with offset ofc)
+    calc:function (e) {
+        var arr = this.el.array().valueOf();
+
+        if (e) {
+            var p = this.transformPoint(e.clientX, e.clientY);
+            //"Line To" next point
+            arr.push(["L"].concat(this.snapToGrid([p.x, p.y])));
+        }
+
+        this.el.plot(arr);
+    },
+
+    clean:function(){
+
+        // Remove all circles
+        this.set.each(function () {
+            this.remove();
+        });
+
+        this.set.clear();
+
+        delete this.set;
+
+    },
+
+    });
+
+}
+
 SVG.on(document, 'DOMContentLoaded', function() {
+
+    extendPath();
 
     drawing = SVG('root-svg').size('100%', '80%');
 
     toolMap["draw"]["select-tool"] = document.getElementById("select-tool");
     toolMap["draw"]["text-tool"] = document.getElementById("text-tool");
+    toolMap["draw"]["path-tool"] = document.getElementById("path-tool");
     toolMap["draw"]["line-tool"] = document.getElementById("line-tool");
     toolMap["draw"]["circle-tool"] = document.getElementById("circle-tool");
-    toolMap["draw"]["poly-tool"] = document.getElementById("poly-tool");
+    //toolMap["draw"]["poly-tool"] = document.getElementById("poly-tool");
 
     toolMap["layer"]["edit-tool"] = document.getElementById("edit-tool");
     toolMap["layer"]["move-tool"] = document.getElementById("move-tool");
@@ -140,7 +190,7 @@ SVG.on(document, 'DOMContentLoaded', function() {
     toolMap["layer"]["void-tool"] = document.getElementById("void-tool");
     toolMap["layer"]["delete-tool"] = document.getElementById("delete-tool");
 
-    setLineTool();
+    setPathTool();
     
     drawing.on('mousedown', function(e){
         //console.log("mousedown occurred, tool is ", tool);
@@ -183,10 +233,15 @@ function attachTool(){
               addLayer(tool);
               tool = drawing.circle().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
               break;
-          case "polyline":
+          case "path":
+              addLayer(tool);
+              tool = drawing.path().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+              break;
+          /*case "polyline":
               addLayer(tool);
               tool = drawing.polyline().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
               break;
+          */
         }
         
         attachTool();
@@ -523,6 +578,13 @@ function resetTextarea(){
 
 }
 
+function setPathTool(){
+  setToggle("path-tool", "draw");
+  
+  tool = drawing.path().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
+  attachTool();
+}
+
 function setLineTool(){
   setToggle("line-tool", "draw");
   
@@ -536,14 +598,14 @@ function setCircleTool(){
   tool = drawing.circle().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
   attachTool();
 }
-
+/*
 function setPolyTool(){
   setToggle("poly-tool", "draw");
 
   tool = drawing.polyline().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
   attachTool();
 }
-
+*/
 function gatherText(elem) {
 
   var text = "";
