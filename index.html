@@ -40,6 +40,7 @@ svg circle:hover {
     <!--<button id="poly-tool" onclick="setPolyTool();"><i class="material-icons">show_chart</i></button>
     <button id="layer-panel-toggle" onclick="toggleLayerPanel();"><i class="material-icons">layers</i></button>-->
     <button><i class="material-icons">save</i></button>
+    <button id="clear-all" onclick="clearAll();"><i class="material-icons">delete_sweep</i></button>
 </div>
 
 <div id="functions">
@@ -121,6 +122,9 @@ var toolMap = {
   "draw" : {},
   "layer" : {}
 };
+
+//this is the number of permanent elements like <filter>
+var NUM_PERM_CHILDREN = 1;
 
 function extendPath(){
   SVG.Element.prototype.draw.extend('path', {
@@ -386,7 +390,16 @@ function selectElement(elem, allowDefault){
     selectedElements = [];
 
     if(elem.id == "root-svg")
-      return;
+      return false;
+
+    //check if this element has a visual layer
+    var layerInfo = document.querySelector("#" + elem.id + "-layer-info");
+
+    //if it doesn't, we won't select it
+    if(layerInfo === null) {
+        return false;
+    }
+
 
     var bbox = elem.getBBox();
     //should replace hardcoded "padding" (+10, -5) with em conversions
@@ -415,6 +428,8 @@ function selectElement(elem, allowDefault){
 
     var selectedCheckbox = document.querySelector("#" + elem.id + "-layer-info input[type='checkbox']");
     selectedCheckbox.checked = true;
+
+    return true;
 }
 
 function setTextSelectableState(selectable){
@@ -598,6 +613,25 @@ function setCircleTool(){
   tool = drawing.circle().attr('stroke',"black").attr('stroke-width',3).attr('fill','none');
   attachTool();
 }
+
+function clearAll(){
+  var rootSvg = document.getElementById("root-svg");
+
+  var unremovableCount = 0;
+
+  //remove everything that can be selected except the current tool instance
+  while(rootSvg.childElementCount > unremovableCount + 1) {
+    var nonPermChild = rootSvg.children[unremovableCount];
+    var svgElem = SVG.get(nonPermChild.id);
+    if( selectElement(nonPermChild) ){
+      removeElement(svgElem);
+    } else {
+      unremovableCount++;
+    }
+  }
+
+}
+
 /*
 function setPolyTool(){
   setToggle("poly-tool", "draw");
