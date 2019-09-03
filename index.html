@@ -123,9 +123,6 @@ var toolMap = {
   "layer" : {}
 };
 
-//this is the number of permanent elements like <filter>
-var NUM_PERM_CHILDREN = 1;
-
 function extendPath(){
   SVG.Element.prototype.draw.extend('path', {
     init:function(e){
@@ -830,6 +827,8 @@ function removeElement(svgElem) {
 
       svg.remove();
   });
+
+  setEnabledStates(document.querySelectorAll(".layer-button"), false);
 }
 
 function setDeleteTool() {
