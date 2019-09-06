@@ -1,3 +1,7 @@
+svg circle:hover {
+	filter: url(#dropshadow);
+}
+
 @font-face {
     font-family: 'Material Icons';
     font-style: normal;
@@ -36,7 +40,7 @@
   }
 
 #root-svg {
-    border: solid black .1em;
+    overflow: visible;
 }
 
 [aria-pressed="true"] {
@@ -58,17 +62,21 @@
 }
 
 .view-layer-parent {
-    display: flex;
 }
 
 .view-div {
-    flex: 1;
+    display: inline-flex;
     padding-right: .5em;
-    height: 100%;
+    width: 60%;
+    height: 80%;
+    border: solid black .1em;
+    overflow: scroll;
 }
 
 .layer-div {
-    display: flex;
+    float: right;
+    width: 35%;
+    display: inline-flex;
     padding-bottom: 0;
     margin-bottom: 0;
 }
